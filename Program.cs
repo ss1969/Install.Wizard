@@ -157,8 +157,14 @@ public struct FileInfoTable
         while (tableSize > 0)
         {
             var nameLength = stream.Read<int>();
-            fileInfoList.Add(new FileDescriptor(stream.ReadString(nameLength), stream.Read<int>(), stream.ReadString(SHA256_LENGTH)));
+            var file = new FileDescriptor(stream.ReadString(nameLength), stream.Read<int>(), stream.ReadString(SHA256_LENGTH));
+            fileInfoList.Add(file);
             tableSize -= nameLength + sizeof(int) + sizeof(int) + SHA256_LENGTH;
+        }
+
+        foreach (var file in fileInfoList)
+        {
+            Trace.WriteLine($"File Name: {file.Name}, Size {file.Size}, SHA256: {file.Sha256}");
         }
 
         return true;
