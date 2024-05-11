@@ -1,10 +1,24 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace InstallerCreator;
+namespace Helper;
 
-public static class Helper
+public static class LOG
+{
+    public static void Info( string message )
+    {
+        Console.WriteLine( message );
+        Trace.WriteLine( message );
+    }
+    public static void Debug( string message )
+    {
+        Trace.WriteLine( message );
+    }
+}
+
+public static class StreamHelper
 {
     public static string CalculateSha256Hash( this Stream stream, long size = -1 )
     {
@@ -13,17 +27,18 @@ public static class Helper
 
         using SHA256 sha256 = SHA256.Create();
         int bytesRead;
+        long totalBytesRead = 0;
 
         if ( size == -1 )
         {
             while ( ( bytesRead = stream.Read( buffer, 0, BLOCK_SIZE ) ) > 0 )
             {
                 sha256.TransformBlock( buffer, 0, bytesRead, null, 0 );
+                totalBytesRead += bytesRead;
             }
         }
         else
         {
-            long totalBytesRead = 0;
             while ( totalBytesRead < size &&
                     ( bytesRead = stream.Read( buffer, 0, (int)Math.Min( size - totalBytesRead, BLOCK_SIZE ) ) ) > 0 )
             {
@@ -31,7 +46,7 @@ public static class Helper
                 totalBytesRead += bytesRead;
             }
         }
-
+        LOG.Debug( $"Calculate SHA : data {totalBytesRead} bytes, size Param: {size}" );
         sha256.TransformFinalBlock( buffer, 0, 0 );
         return BitConverter.ToString( sha256.Hash! ).Replace( "-", "" ).ToLower();
     }
@@ -76,13 +91,14 @@ public static class Helper
     /// Read from stream to get a string.
     /// </summary>
     /// <param name="stream"></param>
-    /// <param name="stringSize"> Must be a correct value or the string returned is useless </param>
+    /// <param name="byteSize"> Must be a correct value or the string returned is useless </param>
     /// <returns></returns>
-    public static string ReadString( this Stream stream, int stringSize )
+    public static string ReadString( this Stream stream, int byteSize, Encoding? encoding = null )
     {
-        var buffer = new byte[stringSize];
-        stream.Read( buffer, 0, stringSize );
-        return BitConverter.ToString( buffer, 0 );
+        encoding ??= Encoding.UTF8;
+        var buffer = new byte[byteSize];
+        stream.Read( buffer, 0, byteSize );
+        return encoding.GetString(buffer);
     }
 
     /// <summary>
@@ -95,7 +111,7 @@ public static class Helper
     public static int WriteString( this Stream stream, string value, Encoding? encoding = null )
     {
         encoding ??= Encoding.UTF8;
-        var buffer = encoding.GetBytes( value );
+        var buffer = encoding.GetBytes( value ); 
         stream.Write( buffer, 0, buffer.Length );
         return buffer.Length;
     }

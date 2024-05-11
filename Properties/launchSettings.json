@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "InstallerCreator": {
+      "commandName": "Project",
+      "commandLineArgs": "Data In.exe1 Out.exe1"
+    }
+  }
+}
