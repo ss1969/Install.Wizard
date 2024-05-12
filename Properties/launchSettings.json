@@ -2,7 +2,7 @@
   "profiles": {
     "InstallerCreator": {
       "commandName": "Project",
-      "commandLineArgs": "Data In.exe1 Out.exe1"
+      "commandLineArgs": "/mode create /data ..\\..\\..\\TestBench\\DataIn"
     }
   }
 }
