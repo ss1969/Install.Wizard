@@ -43,21 +43,17 @@ class Program
         return parameters;
     }
 
-    static bool ValidateParameters(params string?[] parameters)
+    static bool ValidateParameters( NameValueCollection pc, params string?[] parameters)
     {
         if (parameters == null) return false;
         foreach (var p in parameters)
         {
-            Type programType = typeof(Program);
-            var a = programType.GetField(p);
-            var value = a.GetValue(programType);
-
-            if (p == null)
+            if ( pc.GetValues(p) == null)
             {
-                LOG.Error($"Parameter '{nameof(p)}' is NULL");
+                LOG.Error($"Parameter '{p}' is NULL");
                 return false;
             }
-            LOG.Info($"Parameter '{nameof(p)}' is {p}");
+            LOG.Info($"Parameter '{p}' is {pc.GetValues( p )?.FirstOrDefault()}");
         }
         return true;
     }
@@ -72,33 +68,55 @@ class Program
         // Parameters
         NameValueCollection parameters = ParseParameters(args);
 
-        var fileDirectory = parameters.Convert<string>("data");              // directory contains all files
+        var data = parameters.Convert<string>("data");              // directory contains all files
         var source = parameters.Convert<string>("source");              // source EXE file
         var dest = parameters.Convert<string>("dest");              // output EXE file
         var mode = parameters.Convert<string>("mode");              // 'create' 'extract'
-        var verbose = parameters.Convert<bool>("mode");              // show logs in console
+        var verbose = parameters.Convert<bool>("verbose");              // show logs in console
 
         var po = new PackageOperater();
         po.ExtractStatus += POCallback;
 
         if (mode == "create")
         {
-            //if (!ValidateParameters("fileDirectory", "source", "dest")) return;
-
             LOG.Info("Start Create");
+
+            if (!ValidateParameters( parameters, "data", "source", "dest")) return;
             Debug.Assert(source != null);
             Debug.Assert(dest != null);
-            Debug.Assert(fileDirectory != null);
+            Debug.Assert(data != null);
 
-            po.Create(source, dest, fileDirectory);
+            if ( !Path.Exists( source ) )
+            {
+                LOG.Error( "Source file NOT exists" );
+                return;
+            }
+            if ( !Path.Exists( dest ) )
+            {
+                LOG.Error( "Dest file NOT exists" );
+                return;
+            }
+            if ( !Path.Exists( data ) )
+            {
+                LOG.Error( "Input file directory NOT exists" );
+                return;
+            }
+
+            po.Create(source, dest, data);
         }
         else if (mode == "extract")
         {
-            //if (!ValidateParameters("source", "dest")) return;
-
             LOG.Info(message: "Start Extract");
+
+            if (!ValidateParameters( parameters, "source", "dest")) return;
             Debug.Assert(source != null);
             Debug.Assert(dest != null);
+
+            if ( !Path.Exists( source ) )
+            {
+                LOG.Error( "Source file NOT exists" );
+                return;
+            }
 
             po.Extract(source, dest);
         }

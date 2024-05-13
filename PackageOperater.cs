@@ -16,10 +16,14 @@ public class PackageOperater
 
     public void Create(string source, string dest, string fileDirectory)
     {
-        LOG.Info($"File Dir: \t\t{fileDirectory}\nInput: \t\t{source}\nOutput: \t\t{dest}");
+        Debug.Assert( Path.Exists( source ) );
+        Debug.Assert( Path.Exists( dest ) );
+        Debug.Assert( Path.Exists( fileDirectory ) );
+
+        LOG.Info($"File Dir: \t{fileDirectory}\nInput: \t\t{source}\nOutput: \t{dest}");
 
         // create file info list , then to fileTable
-        var filesToAttach = Directory.GetFiles(fileDirectory);
+        var filesToAttach = Directory.GetFiles(fileDirectory, );
         var fileInfoList = filesToAttach.Select(filePath => new FileDescriptor(filePath)).ToList();
 
         // padding files
@@ -56,6 +60,8 @@ public class PackageOperater
     /// <param name="dest"></param>
     public void Extract(string source, string dest, CancellationToken cts = new())
     {
+        Debug.Assert(Path.Exists(source));
+
         // create file table
         LOG.Info("Create File Info Table");
         var fileTable = new FileInfoTable();
