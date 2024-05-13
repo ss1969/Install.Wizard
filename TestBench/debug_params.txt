@@ -1,0 +1,5 @@
+/mode create /data ..\..\..\TestBench\DataIn /source ..\..\..\TestBench\EnglishSource.SRC /dest ..\..\..\TestBench\EnglishOut.out
+
+
+/mode extract /data ..\..\..\TestBench\DataIn /source ..\..\..\TestBench\EnglishOut.out /dest ..\..\..\TestBench\DataOut
+

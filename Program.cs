@@ -122,6 +122,7 @@ class Program
         }
         else
         {
+            LOG.Info("Usage: \nInstallerCreator.exe /mode create /source src.exe /dest dest.ext /data dataFolder\nInstallerCreator.exe /mode extract /source src.exe /dest destFolder");
             LOG.Error("No valid 'mode' parameter set");
         }
     }

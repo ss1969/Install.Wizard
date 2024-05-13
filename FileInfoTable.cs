@@ -43,8 +43,6 @@ public class FileInfoTable
         {
             if (!f.IsValid()) continue;
             Debug.Assert(f.Name != null);
-            Debug.Assert(f.Size != 0);
-            Debug.Assert(f.Sha256 != null);
 
             // write Name, NameLength, FileLength, Sha256 to stream
             TableSize += stream.Write<FILE_NAME_LENGTH_TYPE>(Encoding.UTF8.GetByteCount(f.Name));
@@ -56,7 +54,7 @@ public class FileInfoTable
             LOG.Info($"Table Entry:  {f.Name}, NameLength {f.Name.Length}, Size {f.Size}, SHA256 {f.Sha256}");
             LOG.Debug($"     Table Size Now: {TableSize}");
         }
-        
+
         // calculate sha256 from start
         var currentPosition = stream.Position;
         stream.Seek(0, SeekOrigin.Begin);
@@ -89,21 +87,27 @@ public class FileInfoTable
 
         // read table Size
         stream.Seek(-SHA256_STRLENGTH - sizeof(TABLE_SIZE_TYPE), SeekOrigin.End);
-        TABLE_SIZE_TYPE tableSize = stream.Read<TABLE_SIZE_TYPE>();
-        LOG.Debug($"Table Size: {tableSize} Bytes");
+        TableSize = stream.Read<TABLE_SIZE_TYPE>();
+        LOG.Debug($"Table Size: {TableSize} Bytes");
+
+        // seek to start of table
+        stream.Seek(-SHA256_STRLENGTH - sizeof(TABLE_SIZE_TYPE) - TableSize, SeekOrigin.End);
 
         // parse table
-        stream.Seek(-SHA256_STRLENGTH - sizeof(TABLE_SIZE_TYPE) - tableSize, SeekOrigin.End);
         FileInfoList.Clear();
-        while (tableSize > 0)
+        int t = TableSize;
+        while (t > 0)
         {
             var nameLength = stream.Read<FILE_NAME_LENGTH_TYPE>();
-            var file = new FileDescriptor(stream.ReadString(nameLength),
-                                          stream.Read<FILE_LENGTH_TYPE>(),
-                                          stream.ReadString(SHA256_STRLENGTH, Encoding.ASCII));
-            FileInfoList.Add(file);
-            tableSize -= sizeof(FILE_NAME_LENGTH_TYPE) + nameLength + sizeof(FILE_LENGTH_TYPE) + SHA256_STRLENGTH;
-            LOG.Info($"File Name: {file.Name}, Size {file.Size}, SHA256: {file.Sha256}");
+            var name = stream.ReadString(nameLength);
+            var size = stream.Read<FILE_LENGTH_TYPE>();
+            var sha256 = stream.ReadString(SHA256_STRLENGTH, Encoding.ASCII);
+
+            FileInfoList.Add(new FileDescriptor(name, size, sha256));
+            FileSizeTotal += size;
+            LOG.Info($"File Name: {name}, Size {size}, SHA256: {sha256}");
+         
+            t -= sizeof(FILE_NAME_LENGTH_TYPE) + nameLength + sizeof(FILE_LENGTH_TYPE) + SHA256_STRLENGTH;
         }
 
         return true;

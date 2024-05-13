@@ -9,22 +9,28 @@ public class PackageOperater
     {
         START,
         SUCCESS,
-        FAIL,
+        FAIL_COPY,
+        FAIL_SHA256,
         PERCENTAGE
     }
     public event Action<EXTRACT_STATE, Object?>? ExtractStatus = null;
 
     public void Create(string source, string dest, string fileDirectory)
     {
-        Debug.Assert( Path.Exists( source ) );
-        Debug.Assert( Path.Exists( dest ) );
-        Debug.Assert( Path.Exists( fileDirectory ) );
+        Debug.Assert(Path.Exists(source));
+        Debug.Assert(Path.Exists(dest));
+        Debug.Assert(Path.Exists(fileDirectory));
 
         LOG.Info($"File Dir: \t{fileDirectory}\nInput: \t\t{source}\nOutput: \t{dest}");
 
         // create file info list , then to fileTable
-        var filesToAttach = Directory.GetFiles(fileDirectory, );
-        var fileInfoList = filesToAttach.Select(filePath => new FileDescriptor(filePath)).ToList();
+        var filesToAttach = Helper.Directory.GetAllFiles(fileDirectory);
+        if (filesToAttach == null)
+        {
+            LOG.Info($"No files exist in {fileDirectory}");
+            return;
+        }
+        var fileInfoList = filesToAttach.Select(filePath => new FileDescriptor(filePath, fileDirectory)).ToList();
 
         // padding files
         using (var streamSource = File.OpenRead(source))
@@ -35,10 +41,8 @@ public class PackageOperater
             {
                 if (!f.IsValid()) continue;
                 Debug.Assert(f.Name != null);
-                Debug.Assert(f.Size != 0);
-                Debug.Assert(f.Sha256 != null);
 
-                using var fileStream = File.OpenRead(f.Name);
+                using var fileStream = File.OpenRead(f.AbsolutePath);
                 fileStream.CopyTo(streamOut);
             }
         }
@@ -65,62 +69,72 @@ public class PackageOperater
         // create file table
         LOG.Info("Create File Info Table");
         var fileTable = new FileInfoTable();
-        using (var streamIn = new FileStream(source, FileMode.Open, FileAccess.Read))
-        {
-            var ret = fileTable.ReadFromStream(streamIn);
-            Debug.Assert(ret, "fileTable.ReadFromStream failed");
-        }
+        using var streamIn = new FileStream(source, FileMode.Open, FileAccess.Read);
+
+        var ret = fileTable.ReadFromStream(streamIn);
+        Debug.Assert(ret, "fileTable.ReadFromStream failed");
         Debug.Assert(fileTable.FileInfoList != null, "fileTable.FileInfoList is null");
 
         // prepare dest directory
         LOG.Info($"Prepare directory '{dest}'");
-        if (Directory.Exists(dest))
+        if (System.IO.Directory.Exists(dest))
         {
-            Directory.Delete(dest, true);
+            System.IO.Directory.Delete(dest, true);
         }
-        Directory.CreateDirectory(dest);
+        System.IO.Directory.CreateDirectory(dest);
 
-        // start extract files task
+        // start extract files, seek to an important position
         LOG.Info($"Extracting Files");
-        Task.Factory.StartNew(async () =>
+        streamIn.Seek(fileTable.FileStartPosition(), SeekOrigin.End);
+
+        foreach (var f in fileTable.FileInfoList)
         {
-            using var streamIn = new FileStream(source, FileMode.Open, FileAccess.Read);
-            streamIn.Seek(fileTable.FileStartPosition(), SeekOrigin.Begin);
+            if (cts.IsCancellationRequested) return;
+            if (!f.IsValid()) continue;
+            Debug.Assert(f.Name != null);
 
-            foreach (var f in fileTable.FileInfoList)
+            // start extract one file
+            ExtractStatus?.Invoke(EXTRACT_STATE.START, f.Name);
+
+            // check sub-directory in output folder
+            string? directoryPath = Path.GetDirectoryName(f.Name);
+            if (!String.IsNullOrEmpty(directoryPath) && !System.IO.Directory.Exists(Path.Combine(dest, directoryPath)))
             {
-                if (!f.IsValid()) continue;
-                Debug.Assert(f.Name != null);
-                Debug.Assert(f.Size != 0);
-                Debug.Assert(f.Sha256 != null);
-
-                if (cts.IsCancellationRequested) return;
-
-                // start extract one file
-                ExtractStatus?.Invoke(EXTRACT_STATE.START, f.Name);
-
-                string? directoryPath = Path.GetDirectoryName(f.Name);
-                if (!Directory.Exists(directoryPath)) Directory.CreateDirectory(directoryPath!);
-
-                using var streamOut = new FileStream(Path.Combine(dest, f.Name), FileMode.Open, FileAccess.ReadWrite);
-                await streamOut.CopyToAsync(streamOut, (int)f.Size);
-
-                // compare SHA in table
-                var calcSHA = streamOut.CalculateSha256Hash();
-                if (calcSHA == f.Sha256) ExtractStatus?.Invoke(EXTRACT_STATE.SUCCESS, f.Name);
-                {
-                    ExtractStatus?.Invoke(EXTRACT_STATE.FAIL, f.Name);
-                    LOG.Info($"Extracted file {f.Name} SHA256 {calcSHA} neq Writen {f.Sha256}");
-                }
-
-                // percentage
-
+                System.IO.Directory.CreateDirectory(Path.Combine(dest, directoryPath)!);
             }
 
-        }).ContinueWith(t =>
-        {
-            LOG.Info("End");
-        }, TaskContinuationOptions.OnlyOnRanToCompletion);
+            // file data 
+            using (var streamOut = new FileStream(Path.Combine(dest, f.Name), FileMode.Create, FileAccess.ReadWrite))
+            {
+                // zero size file specific
+                if (f.Size == 0) continue;
 
+                // copy by size
+                try
+                {
+                    streamIn.CopyToN(streamOut, (int)f.Size);
+                }
+                catch (Exception ex)
+                {
+                    ExtractStatus?.Invoke(EXTRACT_STATE.FAIL_COPY, f.Name + " " + ex);
+                    continue;
+                }
+
+                // compare SHA in table
+                streamOut.Seek(0, SeekOrigin.Begin);
+                var calcSHA = streamOut.CalculateSha256Hash();
+                if (calcSHA == f.Sha256)
+                    ExtractStatus?.Invoke(EXTRACT_STATE.SUCCESS, f.Name);
+                else
+                {
+                    ExtractStatus?.Invoke(EXTRACT_STATE.FAIL_SHA256, f.Name);
+                    LOG.Info($"Extracted file {f.Name} SHA256 {calcSHA} neq Writen {f.Sha256}");
+                }
+            }
+
+            // percentage
+            // TODO
+
+        }
     }
 }
