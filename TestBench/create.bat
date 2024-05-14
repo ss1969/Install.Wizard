@@ -1,2 +1,2 @@
-..\bin\Debug\net8.0\InstallerCreator.exe /mode create /source EnglishSource.SRC /dest EnglishOut.out /data DataIn
+..\bin\Debug\net8.0\InstallerCreator.exe /mode create /source InstallerCreator.exe /dest InstallerCreatorOut.exe /data DataIn
 pause

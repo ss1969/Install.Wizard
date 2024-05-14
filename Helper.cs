@@ -156,7 +156,7 @@ public static class StreamExtensions
     /// <param name="size"></param>
     /// <exception cref="InvalidOperationException"></exception>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public static void CopyToN(this Stream source, Stream dest, long size)
+    public async static Task CopyToNAsync(this Stream source, Stream dest, long size)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(dest);
@@ -172,9 +172,10 @@ public static class StreamExtensions
         long totalBytesRead = 0;
         int bytesRead;
 
-        while (totalBytesRead < size && (bytesRead = source.Read(buffer, 0, (int)Math.Min(buffer.Length, size - totalBytesRead))) > 0)
+        while (totalBytesRead < size && 
+            (bytesRead = await source.ReadAsync( buffer.AsMemory( 0, (int)Math.Min(buffer.Length, size - totalBytesRead) ) ) ) > 0)
         {
-            dest.Write(buffer, 0, bytesRead);
+            await dest.WriteAsync( buffer.AsMemory( 0, bytesRead ) );
             totalBytesRead += bytesRead;
         }
     }

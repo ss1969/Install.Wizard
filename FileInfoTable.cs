@@ -4,6 +4,9 @@ using Helper;
 
 namespace InstallerCreator;
 
+//TODO: error / info report change to callback
+
+
 using TABLE_SIZE_TYPE = int;
 using FILE_NAME_LENGTH_TYPE = int;
 using FILE_LENGTH_TYPE = long;
@@ -42,7 +45,8 @@ public class FileInfoTable
         foreach (var f in FileInfoList)
         {
             if (!f.IsValid()) continue;
-            Debug.Assert(f.Name != null);
+            Debug.Assert( f.Name != null );
+            Debug.Assert( f.Sha256 != null );
 
             // write Name, NameLength, FileLength, Sha256 to stream
             TableSize += stream.Write<FILE_NAME_LENGTH_TYPE>(Encoding.UTF8.GetByteCount(f.Name));
